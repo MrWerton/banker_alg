@@ -1,12 +1,20 @@
 import './resource.dart';
 import './process.dart';
+import './resource.dart';
+import './process.dart';
 
 class BankersAlgorithm {
-  List<Resource> availableResources;
-  List<Process> processes;
-  final List<String> history = [];
+  final List<Resource> availableResources;
+  final List<Process> processes;
+  late final List<Resource> availableResourcesCopy;
 
-  BankersAlgorithm(this.availableResources, this.processes);
+  final List<String> safeSequence = [];
+  final List<String> history = [];
+  final Set<Process> executedProcesses = Set();
+
+  BankersAlgorithm(this.availableResources, this.processes) {
+    availableResourcesCopy = List.from(availableResources);
+  }
 
   void checkIfIsSafeState() {
     if (_isSafeState()) {
@@ -18,21 +26,15 @@ class BankersAlgorithm {
   }
 
   bool _isSafeState() {
-    Set<int> executedProcesses = Set();
-    List<Resource> availableResourcesCopy = List.from(availableResources);
-
-    List<String> safeSequence = [];
     int completedProcesses = 0;
 
     while (completedProcesses < processes.length) {
-      int processIndex =
-          _findNextExecutableProcess(executedProcesses, availableResourcesCopy);
-      if (processIndex == -1) {
+      Process? currentProcess = _getExecutableProcess();
+      if (currentProcess == null) {
         return false;
       }
 
-      _executeProcess(processIndex, availableResourcesCopy, executedProcesses,
-          safeSequence);
+      _executeProcess(currentProcess);
       completedProcesses++;
     }
 
@@ -40,20 +42,20 @@ class BankersAlgorithm {
     return true;
   }
 
-  int _findNextExecutableProcess(
-      Set<int> executedProcesses, List<Resource> availableResourcesCopy) {
-    return processes.indexWhere((process) =>
-        !_isProcessExecuted(process, executedProcesses) &&
-        _isResourceAvailable(process, availableResourcesCopy));
+  Process? _getExecutableProcess() {
+    for (var process in processes) {
+      if (!_processAlreadyExecuted(process) && _isResourceAvailable(process)) {
+        return process;
+        break;
+      }
+    }
   }
 
-  bool _isProcessExecuted(Process process, Set<int> executedProcesses) {
-    int processIndex = processes.indexOf(process);
-    return executedProcesses.contains(processIndex);
+  bool _processAlreadyExecuted(process) {
+    return executedProcesses.contains(process);
   }
 
-  bool _isResourceAvailable(
-      Process process, List<Resource> availableResourcesCopy) {
+  bool _isResourceAvailable(Process process) {
     return process.needResources.every((needResource) =>
         needResource.quantity <=
         availableResourcesCopy
@@ -61,28 +63,25 @@ class BankersAlgorithm {
             .quantity);
   }
 
-  void _executeProcess(int processIndex, List<Resource> availableResourcesCopy,
-      Set<int> executedProcesses, List<String> safeSequence) {
+  void _executeProcess(Process process) {
     history.add('-------------------------------');
-    Process process = processes[processIndex];
     history.add(process.name);
     history.add(
-        "before ${availableResourcesCopy.map((e) => '${e.name}=${e.quantity}')}");
+        "current resources: ${availableResourcesCopy.map((e) => '${e.name}=${e.quantity}')}");
 
-    _releaseResources(process, availableResourcesCopy);
-    executedProcesses.add(processIndex);
+    _releaseResources(process);
+    executedProcesses.add(process);
     safeSequence.add(process.name);
 
     history.add(
-        "allocated ${process.allocatedResources.map((element) => '${element.name}=${element.quantity}')}");
+        "resources allocated ${process.allocatedResources.map((element) => '${element.name}=${element.quantity}')}");
     history.add(
-        "need ${process.needResources.map((element) => '${element.name}=${element.quantity}')}");
+        "resources need ${process.needResources.map((element) => '${element.name}=${element.quantity}')}");
     history.add(
-        "after ${availableResourcesCopy.map((e) => '${e.name}=${e.quantity}')}");
+        "new resources ${availableResourcesCopy.map((e) => '${e.name}=${e.quantity}')}");
   }
 
-  void _releaseResources(
-      Process process, List<Resource> availableResourcesCopy) {
+  void _releaseResources(Process process) {
     List<Resource> allocated = process.allocatedResources;
     for (int i = 0; i < allocated.length; i++) {
       Resource resource =
